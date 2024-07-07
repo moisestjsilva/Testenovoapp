@@ -1,1 +1,5 @@
-streamlit
+streamlit==1.15.0
+matplotlib==3.5.2
+pandas==1.4.4
+numpy==1.23.5
+streamlit-option-menu==0.3.13
