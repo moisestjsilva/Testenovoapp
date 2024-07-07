@@ -18,7 +18,7 @@ br_timezone = timezone('America/Sao_Paulo')
 # Função para enviar e-mail
 def send_email(subject, body, to_email, cc_emails=[], image_path=None):
     from_email = "manutencaomnh@gmail.com"
-    password = "axhb fsec ezcg txbz"
+    password = "yrzj auzx xfnf rumm"
     
     # Configurar a mensagem do e-mail
     msg = MIMEMultipart()
