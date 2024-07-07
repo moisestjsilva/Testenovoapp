@@ -189,4 +189,20 @@ if menu == 'Abertura de OS':
             if not os.path.exists(uploads_folder):
                 os.makedirs(uploads_folder)
             image_path = os.path.join(uploads_folder, imagem.name)
-            with open
+            with open(image_path, 'wb') as f:
+                f.write(imagem.getbuffer())
+        
+        os_data = {
+            'Numero_OS': numero_os,
+            'Equipamento_Setor': equipamento_setor,
+            'Motivo_Parada': motivo_parada,
+            'Imagem': image_path if image_path else '',
+            'Status': 'Aberta',
+            'Data_Hora': data_hora,
+            'Item_Usado': '',
+            'Manutencao_Com': '',
+            'Data_Hora_Fechamento': ''
+        }
+        
+        df_os = save_os(df_os, os_data, image_path, emails)
+        st.success(f"OS {numero_os} salva com sucesso!")
