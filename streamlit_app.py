@@ -15,15 +15,10 @@ import time
 
 # Configurar a página para sempre abrir no modo "light"
 st.set_page_config(
+    page_title="Controle de Manutenção de Máquinas",
     layout="wide",
     initial_sidebar_state="expanded",
-    theme={
-        "primaryColor": "#ff4b4b",
-        "backgroundColor": "#f0f2f6",
-        "secondaryBackgroundColor": "#e0e0e0",
-        "textColor": "#000000",
-        "font": "sans serif",
-    }
+    theme="light"
 )
 
 # Definir timezone para Brasília
@@ -194,16 +189,4 @@ if menu == 'Abertura de OS':
             if not os.path.exists(uploads_folder):
                 os.makedirs(uploads_folder)
             image_path = os.path.join(uploads_folder, imagem.name)
-            with open(image_path, "wb") as f:
-                f.write(imagem.getbuffer())
-        
-        df_os = save_os(df_os, {
-            'Numero_OS': numero_os,
-            'Equipamento_Setor': equipamento_setor,
-            'Motivo_Parada': motivo_parada,
-            'Imagem': image_path,
-            'Status': 'Aberta',
-            'Data_Hora': data_hora
-        }, image_path, emails)
-        st.success(f'OS {numero_os} salva com sucesso!')
-        st.balloons()
+            with open
