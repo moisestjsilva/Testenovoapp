@@ -13,6 +13,9 @@ import matplotlib.pyplot as plt
 import calendar
 import time
 
+# Definir o tema padrão como light
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", theme={'base': 'light'})
+
 # Definir timezone para Brasília
 br_timezone = timezone('America/Sao_Paulo')
 
