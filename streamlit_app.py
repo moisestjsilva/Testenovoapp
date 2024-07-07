@@ -11,6 +11,7 @@ from datetime import datetime
 from pytz import timezone
 import matplotlib.pyplot as plt
 import calendar
+import time
 
 # Definir timezone para Brasília
 br_timezone = timezone('America/Sao_Paulo')
@@ -18,7 +19,7 @@ br_timezone = timezone('America/Sao_Paulo')
 # Função para enviar e-mail
 def send_email(subject, body, to_email, cc_emails=[], image_path=None):
     from_email = "manutencaomnh@gmail.com"
-    password = "yrzj auzx xfnf rumm"
+    password = "axhb fsec ezcg txbz"
     
     # Configurar a mensagem do e-mail
     msg = MIMEMultipart()
@@ -151,8 +152,8 @@ emails = load_emails()
 with st.sidebar:
     menu = option_menu(
         'Controle de Manutenção de Máquinas', 
-        ['Dashboard', 'Abertura de OS', 'Fechar OS', 'Cadastrar Listas', 'Visualizar OS', 'Relatórios', 'Configurações', 'Histórico', 'Ajuda'],
-        icons=['grid', 'plus-circle', 'check-circle', 'list', 'eye', 'file-earmark-bar-graph', 'gear', 'clock-history', 'question-circle'],
+        ['Abertura de OS', 'Fechar OS','Dashboard', 'Cadastrar Listas', 'Visualizar OS', 'Relatórios', 'Configurações', 'Histórico', 'Ajuda'],
+        icons=['plus-circle', 'check-circle', 'grid', 'list', 'eye', 'file-earmark-bar-graph', 'gear', 'clock-history', 'question-circle'],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -194,9 +195,17 @@ if menu == 'Abertura de OS':
             'Manutencao_Com': '',
             'Data_Hora_Fechamento': ''
         }, image_path, emails)
-        st.success(f"OS {numero_os} aberta com sucesso")
-        st.experimental_rerun()
 
+        message_placeholder = st.empty()
+        if not df_os[df_os['Numero_OS'] == numero_os].empty:
+            with message_placeholder:
+                st.success(f"Ordem de Serviço {numero_os} salva com sucesso!", icon="✅")
+                time.sleep(10)  # Aguarda 10 segundos antes de continuar
+        else:
+            with message_placeholder:
+                st.error("Erro ao salvar a OS.", icon="❌")
+                time.sleep(10)  # Aguarda 10 segundos antes de continuar
+        st.experimental_rerun()
 elif menu == 'Fechar OS':
     st.title('Fechar Ordem de Serviço (OS)')
     
