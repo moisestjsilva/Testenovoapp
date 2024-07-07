@@ -12,7 +12,6 @@ from pytz import timezone
 import matplotlib.pyplot as plt
 import calendar
 import time
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, VideoTransformerContext, WebRtcMode
 
 # Definir timezone para Brasília
 br_timezone = timezone('America/Sao_Paulo')
@@ -170,221 +169,123 @@ if menu == 'Abertura de OS':
     numero_os = generate_os_number()
     equipamento_setor = st.selectbox('Equipamento - Setor', sorted(equipamentos_setores['Item'].unique()))
     motivo_parada = st.selectbox('Motivo da Parada', motivos_parada['Item'])
+    imagem = st.file_uploader('Adicione uma Imagem', type=['jpg', 'jpeg', 'png'])
+    data_input = st.date_input('Data', value=datetime.now(br_timezone).date())
+    hora_input = st.time_input('Hora', value=datetime.now(br_timezone).time())
+    data_hora = f"{data_input.strftime('%d/%m/%Y')} {hora_input.strftime('%H:%M')}"
     
-    # WebRTC para tirar foto
-    st.subheader("Tirar foto usando a câmera")
-    class VideoTransformer(VideoTransformerBase):
-        def __init__(self):
-            self.snapshot = None
+    if st.button('Salvar'):
+        image_path = None
+        if imagem:
+            uploads_folder = 'uploads'
+            if not os.path.exists(uploads_folder):
+                os.makedirs(uploads_folder)
+            image_path = os.path.join(uploads_folder, imagem.name)
+            with open(image_path, "wb") as f:
+                f.write(imagem.getbuffer())
+        
+        df_os = save_os(df_os, {
+            'Numero_OS': numero_os,
+            'Equipamento_Setor': equipamento_setor,
+            'Motivo_Parada': motivo_parada,
+            'Imagem': image_path,
+            'Status': 'Aberta',
+            'Data_Hora': data_hora,
+            'Item_Usado': '',
+            'Manutencao_Com': '',
+            'Data_Hora_Fechamento': ''
+        }, image_path, emails)
 
-        def transform(self, frame):
-            self.snapshot = frame.to_image()
-            return frame
+        st.success(f'OS {numero_os} salva com sucesso!')
 
-    ctx = webrtc_streamer(key="example", mode=WebRtcMode.SENDRECV, video_transformer_factory=VideoTransformer)
-    if ctx.video_transformer:
-        snapshot_button = st.button("Tirar Foto")
-        if snapshot_button:
-            snapshot = ctx.video_transformer.snapshot
-            if snapshot:
-                snapshot.save("snapshot.jpg")
-                st.image(snapshot, caption="Foto tirada")
-                imagem = "snapshot.jpg"
-            else:
-                st.warning("Erro ao tirar foto.")
-        else:
-            imagem = st.file_uploader('Selecionar uma Imagem', type=['jpg', 'jpeg', 'png'])
-
-    status = st.selectbox('Status', ['Aberta', 'Fechada'])
-    data_hora = datetime.now(br_timezone).strftime('%Y-%m-%d %H:%M:%S')
-    st.write(f"Data e Hora de Abertura: {data_hora}")
-
-    cc_emails = st.multiselect("CC Emails", emails)
-    if st.button('Abrir OS'):
-        if not imagem:
-            st.warning("Por favor, adicione uma imagem antes de abrir a OS.")
-        else:
-            os_data = {
-                'Numero_OS': numero_os,
-                'Equipamento_Setor': equipamento_setor,
-                'Motivo_Parada': motivo_parada,
-                'Imagem': imagem,
-                'Status': status,
-                'Data_Hora': data_hora,
-                'Item_Usado': '',
-                'Manutencao_Com': '',
-                'Data_Hora_Fechamento': ''
-            }
-            df_os = save_os(df_os, os_data, imagem, cc_emails)
-            st.success('Ordem de Serviço aberta com sucesso!')
-            st.balloons()
 elif menu == 'Fechar OS':
     st.title('Fechar Ordem de Serviço (OS)')
-    numero_os = st.number_input('Número da OS', min_value=1, step=1)
-    os_aberta = df_os[(df_os['Numero_OS'] == numero_os) & (df_os['Status'] == 'Aberta')]
-    if not os_aberta.empty:
-        st.write(f"Equipamento/Setor: {os_aberta.iloc[0]['Equipamento_Setor']}")
-        st.write(f"Motivo da Parada: {os_aberta.iloc[0]['Motivo_Parada']}")
-        st.image(os_aberta.iloc[0]['Imagem'])
-        
-        item_usado = st.selectbox('Item Usado', sorted(manutencao_feita_com['Item'].unique()))
-        manutencao_com = st.selectbox('Manutenção Feita Com', sorted(manutencao_feita_com['Item'].unique()))
-        data_hora_fechamento = datetime.now(br_timezone).strftime('%Y-%m-%d %H:%M:%S')
-        st.write(f"Data e Hora de Fechamento: {data_hora_fechamento}")
+    os_list = df_os[df_os['Status'] == 'Aberta']['Numero_OS'].tolist()
+    numero_os = st.selectbox('Selecione a OS', os_list)
+    item_usado = st.selectbox('Item Usado', sorted(manutencao_feita_com['Item'].unique()))
+    manutencao_com = st.selectbox('Manutenção Feita com', sorted(manutencao_feita_com['Item'].unique()))
+    data_input = st.date_input('Data de Fechamento', value=datetime.now(br_timezone).date())
+    hora_input = st.time_input('Hora de Fechamento', value=datetime.now(br_timezone).time())
+    data_hora_fechamento = f"{data_input.strftime('%d/%m/%Y')} {hora_input.strftime('%H:%M')}"
 
-        cc_emails = st.multiselect("CC Emails", emails)
-        if st.button('Fechar OS'):
-            df_os = close_os(df_os, numero_os, item_usado, manutencao_com, data_hora_fechamento, cc_emails)
-            st.success('Ordem de Serviço fechada com sucesso!')
-            st.balloons()
-    else:
-        st.warning('OS não encontrada ou já está fechada.')
-
-
-
-
-
-
-
-
-
-
-        
-        if st.button('Cancelar'):
-            st.experimental_rerun()
-    else:
-        st.info('Nenhuma OS aberta no momento.')
+    if st.button('Salvar'):
+        df_os = close_os(df_os, numero_os, item_usado, manutencao_com, data_hora_fechamento, emails)
+        st.success(f'OS {numero_os} fechada com sucesso!')
 
 elif menu == 'Cadastrar Listas':
-    st.title('Cadastro de Listas')
+    st.title('Cadastrar Equipamentos, Setores e Motivos de Parada')
+    tab = st.selectbox('Selecionar Tabela', ['Equipamentos - Setores', 'Motivos de Parada', 'Manutenção Feita com'])
     
-    st.subheader('Equipamentos - Setores')
-    novo_equipamento_setor = st.text_input('Adicionar Equipamento - Setor')
-    if st.button('Adicionar', key='adicionar_equipamento_setor'):
-        if novo_equipamento_setor:
-            equipamentos_setores = equipamentos_setores.append({'Item': novo_equipamento_setor}, ignore_index=True)
+    if tab == 'Equipamentos - Setores':
+        new_item = st.text_input('Adicionar Equipamento - Setor')
+        if st.button('Adicionar'):
+            equipamentos_setores = equipamentos_setores.append({'Item': new_item}, ignore_index=True)
             save_data(equipamentos_setores, 'equipamentos_setores.csv')
-            st.success('Equipamento - Setor adicionado com sucesso')
-            st.experimental_rerun()
+            st.success(f'{new_item} adicionado com sucesso!')
+        st.dataframe(equipamentos_setores)
     
-    st.subheader('Motivos de Parada')
-    novo_motivo_parada = st.text_input('Adicionar Motivo de Parada')
-    if st.button('Adicionar', key='adicionar_motivo_parada'):
-        if novo_motivo_parada:
-            motivos_parada = motivos_parada.append({'Item': novo_motivo_parada}, ignore_index=True)
+    elif tab == 'Motivos de Parada':
+        new_item = st.text_input('Adicionar Motivo de Parada')
+        if st.button('Adicionar'):
+            motivos_parada = motivos_parada.append({'Item': new_item}, ignore_index=True)
             save_data(motivos_parada, 'motivos_parada.csv')
-            st.success('Motivo de Parada adicionado com sucesso')
-            st.experimental_rerun()
+            st.success(f'{new_item} adicionado com sucesso!')
+        st.dataframe(motivos_parada)
     
-    st.subheader('Manutenção Feita com')
-    novo_manutencao_feita_com = st.text_input('Adicionar Ferramenta')
-    if st.button('Adicionar', key='adicionar_manutencao_feita_com'):
-        if novo_manutencao_feita_com:
-            manutencao_feita_com = manutencao_feita_com.append({'Item': novo_manutencao_feita_com}, ignore_index=True)
+    elif tab == 'Manutenção Feita com':
+        new_item = st.text_input('Adicionar Manutenção Feita com')
+        if st.button('Adicionar'):
+            manutencao_feita_com = manutencao_feita_com.append({'Item': new_item}, ignore_index=True)
             save_data(manutencao_feita_com, 'manutencao_feita_com.csv')
-            st.success('Ferramenta adicionada com sucesso')
-            st.experimental_rerun()
+            st.success(f'{new_item} adicionado com sucesso!')
+        st.dataframe(manutencao_feita_com)
 
-    st.subheader('Emails para Notificações')
-    novo_email = st.text_input('Adicionar Email')
-    if st.button('Adicionar', key='adicionar_email'):
-        if novo_email:
-            emails.append(novo_email)
-            save_emails(emails)
-            st.success('Email adicionado com sucesso')
-            st.experimental_rerun()
+elif menu == 'Dashboard':
+    st.title('Dashboard')
+    st.write('Análise gráfica das OS')
+    total_os = df_os.shape[0]
+    os_abertas = df_os[df_os['Status'] == 'Aberta'].shape[0]
+    os_fechadas = df_os[df_os['Status'] == 'Fechada'].shape[0]
+    st.write(f'Total de OS: {total_os}')
+    st.write(f'OS Abertas: {os_abertas}')
+    st.write(f'OS Fechadas: {os_fechadas}')
+    
+    df_os['Data'] = pd.to_datetime(df_os['Data_Hora'], format='%d/%m/%Y %H:%M')
+    df_os['Ano'] = df_os['Data'].dt.year
+    df_os['Mês'] = df_os['Data'].dt.month
+    df_os['Dia'] = df_os['Data'].dt.day
+    
+    monthly_data = df_os.groupby(['Ano', 'Mês', 'Status']).size().unstack(fill_value=0)
+    st.bar_chart(monthly_data)
 
 elif menu == 'Visualizar OS':
-    st.title('Visualização de Ordens de Serviço')
-    
-    equipamentos_setores_list = equipamentos_setores['Item'].tolist()
-    equipamento_setor_filter = st.multiselect('Filtrar por Equipamento/Setor', sorted(equipamentos_setores_list), default=equipamentos_setores_list)
-    df_filtered = df_os[df_os['Equipamento_Setor'].isin(equipamento_setor_filter)]
-    
-    status_filter = st.selectbox('Filtrar por Status', options=['Todas', 'Aberta', 'Fechada'], index=0)
-    if status_filter != 'Todas':
-        df_filtered = df_filtered[df_filtered['Status'] == status_filter]
-    
-    st.dataframe(df_filtered)
-    
-    if st.checkbox('Mostrar Gráfico de Ordens de Serviço por Mês'):
-        try:
-            df_filtered['Data_Hora'] = pd.to_datetime(df_filtered['Data_Hora'], format='%d/%m/%Y %H:%M', errors='coerce')
-            df_filtered.dropna(subset=['Data_Hora'], inplace=True)
-            df_filtered['Ano'] = df_filtered['Data_Hora'].dt.year
-            df_filtered['Mês'] = df_filtered['Data_Hora'].dt.month
-            df_filtered['Nome_Mês'] = df_filtered['Mês'].apply(lambda x: calendar.month_abbr[x])
-            
-            df_grouped = df_filtered.groupby(['Ano', 'Nome_Mês']).size().unstack(fill_value=0)
-            st.bar_chart(df_grouped.T)
-        except Exception as e:
-            st.error(f"Erro ao gerar gráfico: {e}")
+    st.title('Visualizar Ordem de Serviço (OS)')
+    st.dataframe(df_os)
 
 elif menu == 'Relatórios':
-    st.title('Relatórios de Manutenção')
-    # Código para relatórios aqui
+    st.title('Gerar Relatórios')
+    if st.button('Gerar Relatório Geral'):
+        df_os.to_csv('relatorio_geral.csv', index=False)
+        st.success('Relatório Geral gerado com sucesso!')
+        st.write('Clique no link abaixo para baixar o relatório:')
+        st.markdown(f'<a href="relatorio_geral.csv" download>Baixar Relatório Geral</a>', unsafe_allow_html=True)
 
 elif menu == 'Configurações':
     st.title('Configurações')
-    # Código para configurações aqui
+    st.write('Configurar endereços de e-mail para envio de notificações:')
+    new_email = st.text_input('Adicionar E-mail')
+    if st.button('Adicionar'):
+        emails.append(new_email)
+        save_emails(emails)
+        st.success(f'E-mail {new_email} adicionado com sucesso!')
+    st.write('Lista de e-mails cadastrados:')
+    st.write(emails)
 
 elif menu == 'Histórico':
-    st.title('Histórico de Manutenções')
-    # Código para histórico aqui
+    st.title('Histórico')
+    st.write('Histórico de OS')
+    st.dataframe(df_os)
 
 elif menu == 'Ajuda':
     st.title('Ajuda')
-    st.markdown("""
-    ### Dúvidas Frequentes
-    - **Como abrir uma OS?** Vá até o menu "Abertura de OS" e preencha os campos necessários.
-    - **Como fechar uma OS?** Vá até o menu "Fechar OS", selecione o número da OS e preencha os detalhes do fechamento.
-    - **Como cadastrar novos itens?** Utilize o menu "Cadastrar Listas" para adicionar novos equipamentos, motivos de parada e ferramentas.
-    - **Como visualizar as OS?** Vá até o menu "Visualizar OS" para ver todas as ordens de serviço.
-    - **Como gerar relatórios?** Utilize o menu "Relatórios" para gerar e visualizar relatórios de manutenção.
-    - **Onde estão as configurações?** As configurações podem ser encontradas no menu "Configurações".
-    - **Onde posso ver o histórico de manutenções?** No menu "Histórico".
-    """)
-else:
-    st.title('Dashboard')
-    
-    total_os = len(df_os)
-    os_abertas = len(df_os[df_os['Status'] == 'Aberta'])
-    os_fechadas = len(df_os[df_os['Status'] == 'Fechada'])
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric('Total de OS', total_os)
-    col2.metric('OS Abertas', os_abertas)
-    col3.metric('OS Fechadas', os_fechadas)
-    
-    if st.checkbox('Mostrar Gráfico de Ordens de Serviço por Mês'):
-        try:
-            df_os['Data_Hora'] = pd.to_datetime(df_os['Data_Hora'], format='%d/%m/%Y %H:%M', errors='coerce')
-            df_os.dropna(subset=['Data_Hora'], inplace=True)
-            df_os['Ano'] = df_os['Data_Hora'].dt.year
-            df_os['Mês'] = df_os['Data_Hora'].dt.month
-            df_os['Nome_Mês'] = df_os['Mês'].apply(lambda x: calendar.month_abbr[x])
-            
-            df_grouped = df_os.groupby(['Ano', 'Nome_Mês']).size().unstack(fill_value=0)
-            st.bar_chart(df_grouped.T)
-        except Exception as e:
-            st.error(f"Erro ao gerar gráfico: {e}")
-    
-    if st.checkbox('Mostrar Distribuição de Status das OS'):
-        try:
-            status_counts = df_os['Status'].value_counts()
-            fig, ax = plt.subplots()
-            ax.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            st.pyplot(fig)
-        except Exception as e:
-            st.error(f"Erro ao gerar gráfico de pizza: {e}")
-    
-    if st.checkbox('Equipamento/Setor com mais OS'):
-        try:
-            equip_os_counts = df_os['Equipamento_Setor'].value_counts().nlargest(5)
-            fig, ax = plt.subplots()
-            ax.pie(equip_os_counts, labels=equip_os_counts.index, autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            st.pyplot(fig)
-        except Exception as e:
-            st.error(f"Erro ao gerar gráfico de pizza: {e}")
+    st.write('Se precisar de ajuda, entre em contato com o suporte técnico.')
