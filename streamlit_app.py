@@ -164,11 +164,15 @@ with st.sidebar:
         }
     )
 
+
 if menu == 'Abertura de OS':
     st.title('Abertura de Ordem de Serviço (OS)')
     numero_os = generate_os_number()
-    equipamento_setor = st.selectbox('Equipamento - Setor', sorted(equipamentos_setores['Item'].unique()))
-    motivo_parada = st.selectbox('Motivo da Parada', motivos_parada['Item'])
+    
+    # Adicionar uma opção vazia como primeira escolha
+    equipamento_setor = st.selectbox('Equipamento - Setor', [''] + sorted(equipamentos_setores['Item'].unique()))
+    motivo_parada = st.selectbox('Motivo da Parada', [''] + motivos_parada['Item'].tolist())
+    
     imagem = st.file_uploader('Adicione uma Imagem', type=['jpg', 'jpeg', 'png'])
     data_input = st.date_input('Data', value=datetime.now(br_timezone).date())
     hora_input = st.time_input('Hora', value=datetime.now(br_timezone).time())
@@ -205,6 +209,14 @@ if menu == 'Abertura de OS':
             with message_placeholder:
                 st.error("Erro ao salvar a OS.", icon="❌")
                 time.sleep(10)  # Aguarda 10 segundos antes de continuar
+        st.experimental_rerun()
+
+
+
+
+
+        
+
         st.experimental_rerun()
 elif menu == 'Fechar OS':
     st.title('Fechar Ordem de Serviço (OS)')
