@@ -12,6 +12,7 @@ from pytz import timezone
 import matplotlib.pyplot as plt
 import calendar
 import time
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, VideoTransformerContext, WebRtcMode
 
 # Definir timezone para Brasília
 br_timezone = timezone('America/Sao_Paulo')
@@ -169,62 +170,85 @@ if menu == 'Abertura de OS':
     numero_os = generate_os_number()
     equipamento_setor = st.selectbox('Equipamento - Setor', sorted(equipamentos_setores['Item'].unique()))
     motivo_parada = st.selectbox('Motivo da Parada', motivos_parada['Item'])
-    imagem = st.file_uploader('Adicione uma Imagem', type=['jpg', 'jpeg', 'png'])
-    data_input = st.date_input('Data', value=datetime.now(br_timezone).date())
-    hora_input = st.time_input('Hora', value=datetime.now(br_timezone).time())
-    data_hora = f"{data_input.strftime('%d/%m/%Y')} {hora_input.strftime('%H:%M')}"
     
-    if st.button('Salvar'):
-        image_path = None
-        if imagem:
-            uploads_folder = 'uploads'
-            if not os.path.exists(uploads_folder):
-                os.makedirs(uploads_folder)
-            image_path = os.path.join(uploads_folder, imagem.name)
-            with open(image_path, "wb") as f:
-                f.write(imagem.getbuffer())
-        
-        df_os = save_os(df_os, {
-            'Numero_OS': numero_os,
-            'Equipamento_Setor': equipamento_setor,
-            'Motivo_Parada': motivo_parada,
-            'Imagem': image_path,
-            'Status': 'Aberta',
-            'Data_Hora': data_hora,
-            'Item_Usado': '',
-            'Manutencao_Com': '',
-            'Data_Hora_Fechamento': ''
-        }, image_path, emails)
+    # WebRTC para tirar foto
+    st.subheader("Tirar foto usando a câmera")
+    class VideoTransformer(VideoTransformerBase):
+        def __init__(self):
+            self.snapshot = None
 
-        message_placeholder = st.empty()
-        if not df_os[df_os['Numero_OS'] == numero_os].empty:
-            with message_placeholder:
-                st.success(f"Ordem de Serviço {numero_os} salva com sucesso!", icon="✅")
-                time.sleep(10)  # Aguarda 10 segundos antes de continuar
+        def transform(self, frame):
+            self.snapshot = frame.to_image()
+            return frame
+
+    ctx = webrtc_streamer(key="example", mode=WebRtcMode.SENDRECV, video_transformer_factory=VideoTransformer)
+    if ctx.video_transformer:
+        snapshot_button = st.button("Tirar Foto")
+        if snapshot_button:
+            snapshot = ctx.video_transformer.snapshot
+            if snapshot:
+                snapshot.save("snapshot.jpg")
+                st.image(snapshot, caption="Foto tirada")
+                imagem = "snapshot.jpg"
+            else:
+                st.warning("Erro ao tirar foto.")
         else:
-            with message_placeholder:
-                st.error("Erro ao salvar a OS.", icon="❌")
-                time.sleep(10)  # Aguarda 10 segundos antes de continuar
-        st.experimental_rerun()
+            imagem = st.file_uploader('Selecionar uma Imagem', type=['jpg', 'jpeg', 'png'])
+
+    status = st.selectbox('Status', ['Aberta', 'Fechada'])
+    data_hora = datetime.now(br_timezone).strftime('%Y-%m-%d %H:%M:%S')
+    st.write(f"Data e Hora de Abertura: {data_hora}")
+
+    cc_emails = st.multiselect("CC Emails", emails)
+    if st.button('Abrir OS'):
+        if not imagem:
+            st.warning("Por favor, adicione uma imagem antes de abrir a OS.")
+        else:
+            os_data = {
+                'Numero_OS': numero_os,
+                'Equipamento_Setor': equipamento_setor,
+                'Motivo_Parada': motivo_parada,
+                'Imagem': imagem,
+                'Status': status,
+                'Data_Hora': data_hora,
+                'Item_Usado': '',
+                'Manutencao_Com': '',
+                'Data_Hora_Fechamento': ''
+            }
+            df_os = save_os(df_os, os_data, imagem, cc_emails)
+            st.success('Ordem de Serviço aberta com sucesso!')
+            st.balloons()
 elif menu == 'Fechar OS':
     st.title('Fechar Ordem de Serviço (OS)')
-    
-    os_abertas = df_os[df_os['Status'] == 'Aberta']
-    equipamentos_setores_list = equipamentos_setores['Item'].tolist()
-    equipamento_setor_filter = st.multiselect('Filtrar por Equipamento/Setor', sorted(equipamentos_setores_list), default=equipamentos_setores_list)
-    os_abertas = os_abertas[os_abertas['Equipamento_Setor'].isin(equipamento_setor_filter)]
-    
-    if not os_abertas.empty:
-        os_numero = st.selectbox('Selecione o Número da OS', sorted(os_abertas['Numero_OS'].unique()))
-        item_usado = st.text_input('Item Usado')
-        manutencao_com = st.selectbox('Manutenção Feita com', manutencao_feita_com['Item'])
-        data_input = st.date_input('Data de Fechamento', value=datetime.now(br_timezone).date())
-        hora_input = st.time_input('Hora de Fechamento', value=datetime.now(br_timezone).time())
-        data_hora = f"{data_input.strftime('%d/%m/%Y')} {hora_input.strftime('%H:%M')}"
+    numero_os = st.number_input('Número da OS', min_value=1, step=1)
+    os_aberta = df_os[(df_os['Numero_OS'] == numero_os) & (df_os['Status'] == 'Aberta')]
+    if not os_aberta.empty:
+        st.write(f"Equipamento/Setor: {os_aberta.iloc[0]['Equipamento_Setor']}")
+        st.write(f"Motivo da Parada: {os_aberta.iloc[0]['Motivo_Parada']}")
+        st.image(os_aberta.iloc[0]['Imagem'])
         
-        if st.button('Salvar'):
-            df_os = close_os(df_os, os_numero, item_usado, manutencao_com, data_hora, emails)
-            st.success(f"OS {os_numero} fechada com sucesso")
+        item_usado = st.selectbox('Item Usado', sorted(manutencao_feita_com['Item'].unique()))
+        manutencao_com = st.selectbox('Manutenção Feita Com', sorted(manutencao_feita_com['Item'].unique()))
+        data_hora_fechamento = datetime.now(br_timezone).strftime('%Y-%m-%d %H:%M:%S')
+        st.write(f"Data e Hora de Fechamento: {data_hora_fechamento}")
+
+        cc_emails = st.multiselect("CC Emails", emails)
+        if st.button('Fechar OS'):
+            df_os = close_os(df_os, numero_os, item_usado, manutencao_com, data_hora_fechamento, cc_emails)
+            st.success('Ordem de Serviço fechada com sucesso!')
+            st.balloons()
+    else:
+        st.warning('OS não encontrada ou já está fechada.')
+
+
+
+
+
+
+
+
+
+
         
         if st.button('Cancelar'):
             st.experimental_rerun()
