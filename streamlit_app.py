@@ -13,13 +13,8 @@ import matplotlib.pyplot as plt
 import calendar
 import time
 
-# Configurar a página para sempre abrir no modo "light"
-st.set_page_config(
-    page_title="Controle de Manutenção de Máquinas",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    theme="light"
-)
+# Configurar a página no início do script
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Aplicação de Controle de OS")
 
 # Definir timezone para Brasília
 br_timezone = timezone('America/Sao_Paulo')
